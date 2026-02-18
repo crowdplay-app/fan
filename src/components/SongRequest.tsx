@@ -19,11 +19,9 @@ interface SongRequestProps {
 }
 
 export default function SongRequest({ apiBase, sessionId, sessionName, sessionCode }: SongRequestProps) {
-  const [tab, setTab] = useState<'search' | 'queue'>('search');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Song[]>([]);
   const [searching, setSearching] = useState(false);
-  const [queue, setQueue] = useState<QueueItem[]>([]);
   const [currentSong, setCurrentSong] = useState<QueueItem | null>(null);
   const [toast, setToast] = useState<{ text: string; type: 'success' | 'warning' } | null>(null);
   const [sessionEnded, setSessionEnded] = useState(false);
@@ -40,16 +38,11 @@ export default function SongRequest({ apiBase, sessionId, sessionName, sessionCo
     socket.emit('join-session', sessionId);
 
     socket.on('queue-updated', ({ queue: q, currentSongIndex }) => {
-      setQueue(q);
       if (currentSongIndex >= 0 && q[currentSongIndex]) {
         setCurrentSong(q[currentSongIndex]);
       } else {
         setCurrentSong(null);
       }
-    });
-
-    socket.on('now-playing', ({ song }) => {
-      // Queue update will handle current song
     });
 
     socket.on('duplicate-detected', ({ song, duplicateCount }) => {
@@ -68,7 +61,6 @@ export default function SongRequest({ apiBase, sessionId, sessionName, sessionCo
     fetch(`${apiBase}/fan/session/${sessionCode}`)
       .then(r => r.json())
       .then(data => {
-        setQueue(data.queue || []);
         if (data.currentSongIndex >= 0 && data.queue?.[data.currentSongIndex]) {
           setCurrentSong(data.queue[data.currentSongIndex]);
         }
@@ -114,8 +106,6 @@ export default function SongRequest({ apiBase, sessionId, sessionName, sessionCo
     if (nickname.trim()) setShowNickname(false);
   };
 
-  const pendingQueue = queue.filter(item => item.status === 'pending');
-
   if (sessionEnded) {
     return (
       <div className="fan-container">
@@ -141,7 +131,7 @@ export default function SongRequest({ apiBase, sessionId, sessionName, sessionCo
     return (
       <div className="fan-container">
         <div className="join-container">
-          <div style={{ fontSize: '2.5rem', marginBottom: 8 }}>🎧</div>
+          <img src="/logo.png" alt="CrowdPlay" width="48" height="48" style={{ borderRadius: 10, marginBottom: 8 }} />
           <h1 style={{ fontSize: '1.2rem' }}>{sessionName}</h1>
           <p>What's your name?</p>
           <input
@@ -173,7 +163,10 @@ export default function SongRequest({ apiBase, sessionId, sessionName, sessionCo
     <div className="fan-container">
       {/* Header */}
       <div className="fan-header">
-        <span className="fan-brand">🎵 Crowdplay</span>
+        <span className="fan-brand">
+          <img src="/logo.png" alt="" width="20" height="20" style={{ borderRadius: 4, verticalAlign: 'middle', marginRight: 6 }} />
+          CrowdPlay
+        </span>
         <div className="fan-session-name">{sessionName}</div>
       </div>
 
@@ -189,86 +182,39 @@ export default function SongRequest({ apiBase, sessionId, sessionName, sessionCo
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="tab-bar">
-        <button className={`tab ${tab === 'search' ? 'active' : ''}`} onClick={() => setTab('search')}>
-          🔍 Search
-        </button>
-        <button className={`tab ${tab === 'queue' ? 'active' : ''}`} onClick={() => setTab('queue')}>
-          📋 Queue ({pendingQueue.length})
+      {/* Search */}
+      <div className="search-bar">
+        <input
+          className="search-input"
+          placeholder="Search for a song..."
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSearch()}
+        />
+        <button className="search-btn" onClick={handleSearch}>
+          {searching ? '...' : '🔍'}
         </button>
       </div>
 
-      {/* Search Tab */}
-      {tab === 'search' && (
-        <>
-          <div className="search-bar">
-            <input
-              className="search-input"
-              placeholder="Search for a song..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSearch()}
-            />
-            <button className="search-btn" onClick={handleSearch}>
-              {searching ? '...' : '🔍'}
-            </button>
+      {searchResults.length === 0 && !searching && (
+        <div className="empty-state">
+          <div className="icon">🎶</div>
+          <p>Search for songs to request</p>
+        </div>
+      )}
+
+      {searchResults.map(song => (
+        <div key={song.id} className="song-item">
+          <img src={song.albumCover} alt="" className="song-cover" />
+          <div className="song-info">
+            <div className="song-title">{song.title}</div>
+            <div className="song-artist">{song.artist}</div>
           </div>
-
-          {searchResults.length === 0 && !searching && (
-            <div className="empty-state">
-              <div className="icon">🎶</div>
-              <p>Search for songs to add to the queue</p>
-            </div>
-          )}
-
-          {searchResults.map(song => (
-            <div key={song.id} className="song-item">
-              <img src={song.albumCover} alt="" className="song-cover" />
-              <div className="song-info">
-                <div className="song-title">{song.title}</div>
-                <div className="song-artist">{song.artist}</div>
-              </div>
-              <button className="song-action" onClick={() => handleRequest(song)}>
-                + Add
-              </button>
-            </div>
-          ))}
-        </>
-      )}
-
-      {/* Queue Tab */}
-      {tab === 'queue' && (
-        <>
-          {pendingQueue.length === 0 ? (
-            <div className="empty-state">
-              <div className="icon">📭</div>
-              <p>Queue is empty. Be the first to request a song!</p>
-            </div>
-          ) : (
-            pendingQueue.map((item, idx) => (
-              <div key={item.id} className="song-item">
-                <div className="queue-pos">{idx + 1}</div>
-                <img src={item.song.albumCover} alt="" className="song-cover" />
-                <div className="song-info">
-                  <div className="song-title">{item.song.title}</div>
-                  <div className="song-artist">
-                    {item.song.artist}
-                    <span style={{ color: 'var(--text-muted)', marginLeft: 8, fontSize: '0.75rem' }}>
-                      by {item.requestedBy}
-                    </span>
-                    {item.duplicateCount > 0 && (
-                      <span style={{ color: 'var(--warning)', marginLeft: 6, fontSize: '0.75rem' }}>
-                        🔥 {item.duplicateCount + 1}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </>
-      )}
+          <button className="song-action" onClick={() => handleRequest(song)}>
+            + Add
+          </button>
+        </div>
+      ))}
 
       {/* Toast */}
       {toast && (

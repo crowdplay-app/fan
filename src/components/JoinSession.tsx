@@ -53,8 +53,8 @@ export default function JoinSession({ apiBase, onJoined }: JoinSessionProps) {
   return (
     <div className="fan-container">
       <div className="join-container">
-        <div style={{ marginBottom: 8, fontSize: '3rem' }}>🎵</div>
-        <h1>Crowdplay</h1>
+        <img src="/logo.png" alt="CrowdPlay" width="64" height="64" style={{ borderRadius: 12, marginBottom: 8 }} />
+        <h1>CrowdPlay</h1>
         <p>Enter the session code to request songs</p>
         <form onSubmit={handleSubmit}>
           <input
