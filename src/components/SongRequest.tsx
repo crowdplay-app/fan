@@ -93,7 +93,11 @@ export default function SongRequest({ apiBase, sessionId, sessionName, sessionCo
       });
       const data = await res.json();
       if (data.duplicate) {
-        showToast(`"${song.title}" upvoted! (${data.duplicateCount + 1} votes)`, 'warning');
+        if (data.alreadyVoted) {
+          showToast(`You already voted for "${song.title}"`, 'warning');
+        } else {
+          showToast(`"${song.title}" upvoted! (${data.duplicateCount + 1} votes)`, 'warning');
+        }
       } else {
         showToast(`"${song.title}" added to queue!`, 'success');
       }
